@@ -1,7 +1,10 @@
 ## 1go-Uploader
 go-Uploader 表单上传扩展
 
-## 1. 快速开始
+## 1、Install
+    go get github.com/go-up-boy/gouploader@dev
+
+## 2. 快速开始
     // Go-zero 使用
     // 1、定义好结构体，需要生成后手动修改
     type UploadReq struct {
