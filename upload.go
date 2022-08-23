@@ -117,7 +117,7 @@ func (u *singleUpload) initMustParams() error {
 		u.MoveFilename = u.FileHeader.Filename
 	}
 	if u.MoveDir == "" {
-		u.MoveDir = "/uploads"
+		u.MoveDir = "./uploads"
 	}
 	if _, err := os.Stat(u.MoveDir); err != nil {
 		if os.IsNotExist(err) {
