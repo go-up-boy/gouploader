@@ -53,7 +53,6 @@ go-Uploader 表单上传扩展，支持秒传、断点续传、自定义存储Ha
     type Storage interface {
         Load(hash string) (StorageFile, error)
         Store(file *StorageFile) error
-        Empty() bool
     }
     // 注意: 一定要包含结构体字段
     type StorageFile struct {
