@@ -17,7 +17,6 @@ type StorageFile struct {
 type Storage interface {
 	Load(hash string) (StorageFile, error)
 	Store(file *StorageFile) error
-	Empty() bool
 }
 
 type Default struct {
