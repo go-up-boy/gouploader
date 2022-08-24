@@ -80,6 +80,7 @@ func (u *singleUpload) Move() (string, error) {
 
 func (u *singleUpload) SeekerMove(hash string) (string, error) {
 	defer u.File.Close()
+	var filename string
 	if err := u.initMustParams(); err != nil {
 		return "", err
 	}
@@ -88,10 +89,12 @@ func (u *singleUpload) SeekerMove(hash string) (string, error) {
 		return "", err
 	}
 	if moveStorage.Empty() {
-		moveStorage.Filename = u.MoveDir + u.MoveFilename
+		filename = u.MoveDir + u.MoveFilename
+	} else {
+		filename = moveStorage.Filename
 	}
-	fileInfo, err := os.Stat(moveStorage.Filename)
-	moveFile, errf := os.OpenFile(moveStorage.Filename, os.O_CREATE|os.O_APPEND|os.O_RDWR, os.ModePerm)
+	fileInfo, err := os.Stat(filename)
+	moveFile, errf := os.OpenFile(filename, os.O_CREATE|os.O_APPEND|os.O_RDWR, os.ModePerm)
 	defer u.storeSpeedProgress(&moveStorage)
 	defer moveFile.Close()
 	if errf != nil {
@@ -100,17 +103,22 @@ func (u *singleUpload) SeekerMove(hash string) (string, error) {
 	if err == nil {
 		if FileMd5(moveFile) == hash {
 			moveStorage.Hash = hash
-			// hash一致，上传完成；否则 文件重名
+			moveStorage.Size = fileInfo.Size()
+			moveStorage.MoveSize = fileInfo.Size()
+			moveStorage.Filename = filename
+			// hash一致，上传完成
 			return moveStorage.Filename, nil
 		}
 		if moveStorage.Empty() {
 			// 当没有hash存储，重名文件 提示 Err
 			return moveStorage.Filename, errors.New(RepeatingErr)
 		} else {
+			// 断点续传文件字节是否符合
 			if (fileInfo.Size() + u.FileHeader.Size) != moveStorage.Size {
 				return moveStorage.Filename, errors.New(SizeErr)
 			}
 		}
+		moveStorage.Filename = filename
 		moveStorage.MoveSize = fileInfo.Size()
 	} else if os.IsNotExist(err) {
 		moveStorage.Hash = hash
