@@ -14,12 +14,12 @@ go-Uploader 表单上传扩展，支持秒传、断点续传、自定义存储Ha
     // 2、svc 增加 servicecontent
     type ServiceContext struct {
         Config config.Config
-        GoUploader *gouploader.Uploader
+        GoUploader gouploader.Uploader
     }
     func NewServiceContext(c config.Config) *ServiceContext {
-        return &ServiceContext{
-        Config:     c,
-        GoUploader: gouploader.NewUploader(&gouploader.Default{}),
+            return &ServiceContext{
+            Config:     c,
+		    GoUploader: gouploader.NewUploader(&gouploader.Default{}),
         }
     }
     // 3. handle 接收file
