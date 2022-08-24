@@ -2,7 +2,7 @@
 go-Uploader 表单上传扩展，支持秒传、断点续传、自定义存储Hash
 
 ## 1、Install
-    go get github.com/go-up-boy/gouploader@dev
+    go get github.com/go-up-boy/gouploader
 
 ## 2. 快速开始
     // Go-zero 使用
@@ -41,7 +41,7 @@ go-Uploader 表单上传扩展，支持秒传、断点续传、自定义存储Ha
     NewStorage().
     CheckSeekerMove("bb53183243f4485383e1ea4bdf1e954a")
 
-    // 2、上传文件
+    // 2、上传文件，记得 前端根据 方法CheckSeekerMove(hash) 返回字节数 切分文件
     path, err := l.svcCtx.GoUploader.
 		SingleUpload(req.File, req.FileHeader).
 		SetMoveDir("./uploads/").
