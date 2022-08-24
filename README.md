@@ -64,4 +64,4 @@ go-Uploader 表单上传扩展，支持秒传、断点续传、自定义存储Ha
     }
 
 ## 5、流程图
-![https://s1.ax1x.com/2022/08/24/vgptl8.png](img.png)
+![post](https://s1.ax1x.com/2022/08/24/vgptl8.png)
