@@ -17,6 +17,7 @@ type StorageFile struct {
 type Storage interface {
 	Load(hash string) (StorageFile, error)
 	Store(file *StorageFile) error
+	Empty() bool
 }
 
 type Default struct {
@@ -29,8 +30,7 @@ func (d *Default) Load(hash string) (StorageFile, error) {
 		if err != nil {
 			return file, err
 		}
-		err = json.Unmarshal(b, &file)
-		if err != nil {
+		if err = json.Unmarshal(b, &file); err != nil {
 			return file, err
 		}
 	}
@@ -46,4 +46,3 @@ func (d *Default) Store(file *StorageFile) error {
 func (d StorageFile) Empty() bool {
 	return d == StorageFile{}
 }
-

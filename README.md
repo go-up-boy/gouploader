@@ -1,5 +1,5 @@
 ## 1go-Uploader
-go-Uploader 表单上传扩展
+go-Uploader 表单上传扩展，支持秒传、断点续传、自定义存储Hash
 
 ## 1、Install
     go get github.com/go-up-boy/gouploader@dev
@@ -32,3 +32,36 @@ go-Uploader 表单上传扩展
 		SingleUpload(req.File, req.FileHeader).
 		SetMoveDir("./uploads/").
 		Move()
+
+
+## 3. 断点续传、秒传的使用
+    // 前端计算文件 md5 32位 hash值
+    // 1、使用该方法 检查文件上传进度，返回已经上传字节数
+    l.svcCtx.GoUploader.
+    NewStorage().
+    CheckSeekerMove("bb53183243f4485383e1ea4bdf1e954a")
+
+    // 2、上传文件
+    path, err := l.svcCtx.GoUploader.
+		SingleUpload(req.File, req.FileHeader).
+		SetMoveDir("./uploads/").
+		SeekerMove("ca3e4b36c225c370baa3062f347386de")
+## 4. Storage存储文件哈希接口
+    // 实现 Storage 接口,传入初始化参数即可
+    gouploader.NewUploader(&gouploader.Default{})
+
+    type Storage interface {
+        Load(hash string) (StorageFile, error)
+        Store(file *StorageFile) error
+        Empty() bool
+    }
+    // 注意: 一定要包含结构体字段
+    type StorageFile struct {
+        Filename string
+        Hash string
+        MoveSize int64
+        Size int64
+    }
+
+## 5、流程图
+![https://s1.ax1x.com/2022/08/24/vgptl8.png](img.png)

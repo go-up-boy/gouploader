@@ -1,11 +1,21 @@
 package gouploader
 
 import (
+	"errors"
 	"io"
 	"mime/multipart"
 	"os"
 	"path/filepath"
 	"strings"
+)
+
+// SizeErr 使用 CheckSeekerMove(hash) 检查文件上传进度；切分后重新上传；
+// HashedErr 上传完成后 校验哈希，哈希与前端不一致
+// RepeatingErr 上传名称已经存在；重新命名
+const (
+	SizeErr 	= "upload size error"
+	HashedErr     = "file uploaded hash is different"
+	RepeatingErr	= "files repeating"
 )
 
 type singleUpload struct {
@@ -23,12 +33,21 @@ type singleStandard interface {
 	SetMoveDir(dir string) *singleUpload
 	SetAllowExt(ext []string) *singleUpload
 }
+type storageStandard interface {
+	CheckSeekerMove(hash string) (int64, error)
+}
 
 func (uploader *Uploader)SingleUpload(file *multipart.File, header *multipart.FileHeader) singleStandard {
 	return &singleUpload{
-		File: *file,
+		File:       *file,
 		FileHeader: header,
-		storage: *uploader.storage,
+		storage:    *uploader.storage,
+	}
+}
+
+func (uploader *Uploader)NewStorage() storageStandard {
+	return &singleUpload{
+		storage:    *uploader.storage,
 	}
 }
 
@@ -65,31 +84,43 @@ func (u *singleUpload) SeekerMove(hash string) (string, error) {
 		return "", err
 	}
 	moveStorage, err := u.storage.Load(hash)
-	if moveStorage.Empty() {
-		moveStorage.Hash = hash
-		moveStorage.Filename = u.MoveDir + u.MoveFilename
-		moveStorage.Size = u.FileHeader.Size
-	}
-	fileInfo, err := os.Stat(moveStorage.Filename)
-	if err == nil {
-		if fileInfo.Size() == u.FileHeader.Size {
-			return moveStorage.Filename, nil
-		}
-		moveStorage.MoveSize = fileInfo.Size()
-		_, err = u.File.Seek(fileInfo.Size(), io.SeekStart)
-		if err != nil {
-			return "", err
-		}
-	} else if os.IsNotExist(err) {
-		moveStorage.Hash = hash
-		moveStorage.Filename = u.MoveDir + u.MoveFilename
-		moveStorage.Size = u.FileHeader.Size
-	}
-	moveFile, err := os.OpenFile(moveStorage.Filename, os.O_CREATE|os.O_APPEND|os.O_RDWR, os.ModePerm)
-	defer moveFile.Close()
 	if err != nil {
 		return "", err
 	}
+	if moveStorage.Empty() {
+		moveStorage.Filename = u.MoveDir + u.MoveFilename
+	}
+	fileInfo, err := os.Stat(moveStorage.Filename)
+	moveFile, errf := os.OpenFile(moveStorage.Filename, os.O_CREATE|os.O_APPEND|os.O_RDWR, os.ModePerm)
+	defer u.storeSpeedProgress(&moveStorage)
+	defer moveFile.Close()
+	if errf != nil {
+		return "", errf
+	}
+	if err == nil {
+		if FileMd5(moveFile) == hash {
+			moveStorage.Hash = hash
+			// hash一致，上传完成；否则 文件重名
+			return moveStorage.Filename, nil
+		}
+		if moveStorage.Empty() {
+			// 当没有hash存储，重名文件 提示 Err
+			return moveStorage.Filename, errors.New(RepeatingErr)
+		} else {
+			if (fileInfo.Size() + u.FileHeader.Size) != moveStorage.Size {
+				return moveStorage.Filename, errors.New(SizeErr)
+			}
+		}
+		moveStorage.MoveSize = fileInfo.Size()
+	} else if os.IsNotExist(err) {
+		moveStorage.Hash = hash
+		moveStorage.Filename = u.MoveDir + u.MoveFilename
+		moveStorage.MoveSize = 0
+		moveStorage.Size = u.FileHeader.Size
+	} else {
+		return "", err
+	}
+	_, err = moveFile.Seek(moveStorage.MoveSize, io.SeekStart)
 	buffer := make([]byte, 32768)
 	for {
 		n, err := u.File.Read(buffer)
@@ -99,13 +130,39 @@ func (u *singleUpload) SeekerMove(hash string) (string, error) {
 			}
 		}
 		_, err = moveFile.Write(buffer[:n])
-		moveStorage.MoveSize = moveStorage.MoveSize + int64(n)
 		if err != nil {
 			return "", err
 		}
+		moveStorage.MoveSize = moveStorage.MoveSize + int64(n)
 	}
-	u.storeSpeedProgress(&moveStorage)
-	return moveStorage.Filename, nil
+	_, err = moveFile.Seek(0, io.SeekStart)
+	if err != nil {
+		return "", err
+	}
+	if hash == FileMd5(moveFile) {
+		moveStorage.Hash = hash
+		return moveStorage.Filename, nil
+	}
+	return moveStorage.Filename, errors.New(HashedErr)
+}
+
+func (u *singleUpload) CheckSeekerMove(hash string) (int64, error) {
+	moveStorage, err := u.storage.Load(hash)
+	if err != nil || moveStorage.Empty() {
+		return 0, err
+	}
+	fileInfo, err := os.Stat(moveStorage.Filename)
+	if err == nil {
+		moveStorage.MoveSize = fileInfo.Size()
+	} else if os.IsNotExist(err) {
+		return 0, nil
+	} else {
+		return 0, err
+	}
+	if err = u.storage.Store(&moveStorage); err != nil {
+		return 0, err
+	}
+	return moveStorage.MoveSize, nil
 }
 
 func (u *singleUpload) initMustParams() error {
@@ -145,5 +202,7 @@ func (u *singleUpload) SetAllowExt(ext []string) *singleUpload {
 }
 
 func (u *singleUpload) storeSpeedProgress(file *StorageFile) {
-	u.storage.Store(file)
+	if file.Hash != "" {
+		u.storage.Store(file)
+	}
 }
