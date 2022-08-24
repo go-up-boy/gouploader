@@ -41,13 +41,13 @@ func (uploader *Uploader)SingleUpload(file *multipart.File, header *multipart.Fi
 	return &singleUpload{
 		File:       *file,
 		FileHeader: header,
-		storage:    *uploader.storage,
+		storage:    uploader.storage,
 	}
 }
 
 func (uploader *Uploader)NewStorage() storageStandard {
 	return &singleUpload{
-		storage:    *uploader.storage,
+		storage:    uploader.storage,
 	}
 }
 
