@@ -29,6 +29,7 @@ type singleUpload struct {
 
 type singleStandard interface {
 	Move() (string, error)
+	SeekerMove(hash string) (string, error)
 	SetMoveFilename(filename string) *singleUpload
 	SetMoveDir(dir string) *singleUpload
 	SetAllowExt(ext []string) *singleUpload
