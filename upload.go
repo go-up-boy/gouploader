@@ -13,10 +13,12 @@ import (
 // HashedErr 上传完成后 校验哈希，哈希与前端不一致
 // RepeatingErr 上传名称已经存在；重新命名
 const (
-	SizeErr 	= "upload size error"
-	HashedErr     = "file uploaded hash is different"
+	SizeErr 		= "upload size error"
+	HashedErr       = "file uploaded hash is different"
 	RepeatingErr	= "files repeating"
+	BuffSize 		= 32 * 1024
 )
+var errInvalidWrite = errors.New("invalid write result")
 
 type singleUpload struct {
 	File       multipart.File
@@ -52,28 +54,32 @@ func (uploader *Uploader)NewStorage() storageStandard {
 	}
 }
 
-func (u *singleUpload) Move() (string, error) {
+func (u *singleUpload) Move() (filename string, err error) {
 	defer u.File.Close()
-	if err := u.initMustParams(); err != nil {
+	if err = u.initMustParams(); err != nil {
 		return "", err
 	}
-	filename := u.MoveDir + u.MoveFilename
+	filename = u.MoveDir + u.MoveFilename
 	moveFile, err := os.OpenFile(filename, os.O_CREATE|os.O_RDWR, os.ModePerm)
-	defer moveFile.Close()
 	if err != nil {
 		return "", err
 	}
-	buffer := make([]byte, 32768)
+	defer moveFile.Close()
+
+	buffer := make([]byte, BuffSize)
 	for {
-		n, err := u.File.Read(buffer)
-		if err != nil {
-			if err == io.EOF{
-				break
+		n, er := u.File.Read(buffer)
+		if n > 0 {
+			nw, ew := moveFile.Write(buffer[:n])
+			if ew != nil || nw < 0 || nw != n {
+				return "", errInvalidWrite
 			}
 		}
-		_, err = moveFile.Write(buffer[:n])
-		if err != nil {
-			return "", err
+		if er != nil {
+			if er == io.EOF{
+				break
+			}
+			return "", er
 		}
 	}
 	return filename, nil
@@ -95,12 +101,13 @@ func (u *singleUpload) SeekerMove(hash string) (string, error) {
 		filename = moveStorage.Filename
 	}
 	fileInfo, err := os.Stat(filename)
-	moveFile, errf := os.OpenFile(filename, os.O_CREATE|os.O_APPEND|os.O_RDWR, os.ModePerm)
+	moveFile, ef := os.OpenFile(filename, os.O_CREATE|os.O_APPEND|os.O_RDWR, os.ModePerm)
 	defer u.storeSpeedProgress(&moveStorage)
-	defer moveFile.Close()
-	if errf != nil {
-		return "", errf
+	if ef != nil {
+		return "", ef
 	}
+	defer moveFile.Close()
+
 	if err == nil {
 		if FileMd5(moveFile) == hash {
 			moveStorage.Hash = hash
@@ -130,17 +137,20 @@ func (u *singleUpload) SeekerMove(hash string) (string, error) {
 		return "", err
 	}
 	_, err = moveFile.Seek(moveStorage.MoveSize, io.SeekStart)
-	buffer := make([]byte, 32768)
+	buffer := make([]byte, BuffSize)
 	for {
-		n, err := u.File.Read(buffer)
-		if err != nil {
+		n, er := u.File.Read(buffer)
+		if n > 0 {
+			nw, ew := moveFile.Write(buffer[:n])
+			if ew != nil || nw < 0 || nw != n {
+				return "", errInvalidWrite
+			}
+		}
+		if er != nil {
 			if err == io.EOF{
 				break
 			}
-		}
-		_, err = moveFile.Write(buffer[:n])
-		if err != nil {
-			return "", err
+			return "", er
 		}
 		moveStorage.MoveSize = moveStorage.MoveSize + int64(n)
 	}
@@ -183,7 +193,7 @@ func (u *singleUpload) initMustParams() error {
 		u.MoveFilename = u.FileHeader.Filename
 	}
 	if u.MoveDir == "" {
-		u.MoveDir = "./uploads"
+		u.MoveDir = "./uploads/"
 	}
 	if _, err := os.Stat(u.MoveDir); err != nil {
 		if os.IsNotExist(err) {
