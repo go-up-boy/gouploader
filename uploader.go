@@ -1,11 +1,11 @@
 package gouploader
 
 type Uploader struct {
-	storage *Storage
+	storage Storage
 }
 
-func NewUploader(storage *Storage) *Uploader {
-	return &Uploader{
+func NewUploader(storage Storage) Uploader {
+	return Uploader{
 		storage: storage,
 	}
 }

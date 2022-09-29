@@ -2,11 +2,12 @@
 go-Uploader 表单上传扩展，支持秒传、断点续传、自定义存储Hash
 
 ## 1、Install
-    go get github.com/go-up-boy/gouploader@dev
+    go get github.com/go-up-boy/gouploader
 
 ## 2. 快速开始
     // Go-zero 使用
-    // 1、定义好结构体，需要生成后手动修改
+    // 1、在handle里单独处理
+    // 注意：千万不要定义在 types结构体里，会导致 内存暴涨！！！
     type UploadReq struct {
         File       *multipart.File `form:"file,optional"`
         FileHeader *multipart.FileHeader `form:"file_header,optional"`
@@ -14,12 +15,12 @@ go-Uploader 表单上传扩展，支持秒传、断点续传、自定义存储Ha
     // 2、svc 增加 servicecontent
     type ServiceContext struct {
         Config config.Config
-        GoUploader *gouploader.Uploader
+        GoUploader gouploader.Uploader
     }
     func NewServiceContext(c config.Config) *ServiceContext {
-        return &ServiceContext{
-        Config:     c,
-        GoUploader: gouploader.NewUploader(&gouploader.Default{}),
+            return &ServiceContext{
+            Config:     c,
+		    GoUploader: gouploader.NewUploader(&gouploader.Default{}),
         }
     }
     // 3. handle 接收file
@@ -33,15 +34,14 @@ go-Uploader 表单上传扩展，支持秒传、断点续传、自定义存储Ha
 		SetMoveDir("./uploads/").
 		Move()
 
-
-## 3. 断点续传、秒传的使用
+## 4. 断点续传、秒传的使用
     // 前端计算文件 md5 32位 hash值
     // 1、使用该方法 检查文件上传进度，返回已经上传字节数
     l.svcCtx.GoUploader.
     NewStorage().
     CheckSeekerMove("bb53183243f4485383e1ea4bdf1e954a")
 
-    // 2、上传文件
+    // 2、上传文件，记得 前端根据 方法CheckSeekerMove(hash) 返回字节数 切分文件
     path, err := l.svcCtx.GoUploader.
 		SingleUpload(req.File, req.FileHeader).
 		SetMoveDir("./uploads/").
@@ -53,7 +53,6 @@ go-Uploader 表单上传扩展，支持秒传、断点续传、自定义存储Ha
     type Storage interface {
         Load(hash string) (StorageFile, error)
         Store(file *StorageFile) error
-        Empty() bool
     }
     // 注意: 一定要包含结构体字段
     type StorageFile struct {
