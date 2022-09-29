@@ -6,7 +6,8 @@ go-Uploader 表单上传扩展，支持秒传、断点续传、自定义存储Ha
 
 ## 2. 快速开始
     // Go-zero 使用
-    // 1、定义好结构体，需要生成后手动修改
+    // 1、在handle里单独处理
+    // 注意：千万不要定义在 types结构体里，会导致 内存暴涨！！！
     type UploadReq struct {
         File       *multipart.File `form:"file,optional"`
         FileHeader *multipart.FileHeader `form:"file_header,optional"`
@@ -33,8 +34,7 @@ go-Uploader 表单上传扩展，支持秒传、断点续传、自定义存储Ha
 		SetMoveDir("./uploads/").
 		Move()
 
-
-## 3. 断点续传、秒传的使用
+## 4. 断点续传、秒传的使用
     // 前端计算文件 md5 32位 hash值
     // 1、使用该方法 检查文件上传进度，返回已经上传字节数
     l.svcCtx.GoUploader.
